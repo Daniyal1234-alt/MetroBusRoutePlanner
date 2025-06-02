@@ -5,47 +5,62 @@ import folium
 st.set_page_config(page_title="Metro Router App", layout="centered")
 st.title("🗺️ Islamabad-Rawalpindi Metro Route Planner")
 
-st.markdown("""
-Use the buttons below to pin your **Current Location** and **Destination** on the map.
-""")
+st.markdown("Pin your **Current Location** and **Destination** using the map or select from famous locations.")
 
-# Session state to keep pins between reruns
+# Sample famous locations (expand as needed)
+famous_places = {
+    "Select a place": None,
+    "Faisal Mosque": (33.7294, 73.0387),
+    "Centaurus Mall": (33.7074, 73.0519),
+    "Rawalpindi Saddar": (33.5973, 73.0531),
+    "Zero Point": (33.6845, 73.0479),
+    "Faizabad Interchange": (33.6580, 73.0744),
+    "NUST H-12": (33.6434, 72.9908),
+    "Pir Wadhai Bus Terminal": (33.6231, 73.0643),
+    "I-8 Markaz": (33.6846, 73.0709)
+}
+
+# Session state
 if "start_coords" not in st.session_state:
     st.session_state.start_coords = None
 if "end_coords" not in st.session_state:
     st.session_state.end_coords = None
+if "dropping" not in st.session_state:
+    st.session_state.dropping = None
 
-# Drop pin buttons
+# Dropdowns for popular places
 col1, col2 = st.columns(2)
 with col1:
-    drop_start = st.button("📍 Drop Current Location")
+    selected_start = st.selectbox("📍 Choose Current Location", list(famous_places.keys()), key="start")
+    if famous_places[selected_start]:
+        st.session_state.start_coords = {"lat": famous_places[selected_start][0], "lng": famous_places[selected_start][1]}
 with col2:
-    drop_end = st.button("🏁 Drop Destination")
+    selected_end = st.selectbox("🏁 Choose Destination", list(famous_places.keys()), key="end")
+    if famous_places[selected_end]:
+        st.session_state.end_coords = {"lat": famous_places[selected_end][0], "lng": famous_places[selected_end][1]}
 
-# Setup base map
-m = folium.Map(location=[33.6844, 73.0479], zoom_start=12)
+st.divider()
 
-# Handle pin drop logic
-if drop_start:
-    st.info("Click on the map to set your CURRENT location.")
-    st.session_state.dropping = "start"
-elif drop_end:
-    st.info("Click on the map to set your DESTINATION.")
-    st.session_state.dropping = "end"
+# Buttons to manually drop pins
+col3, col4 = st.columns(2)
+with col3:
+    if st.button("🔵 Drop Current Location Manually"):
+        st.session_state.dropping = "start"
+with col4:
+    if st.button("🟢 Drop Destination Manually"):
+        st.session_state.dropping = "end"
 
-# Display the folium map and capture user click
-map_data = st_folium(m, width=700, height=500)
+# Set map center
+center = [33.6844, 73.0479]  # default
+if st.session_state.end_coords:
+    center = [st.session_state.end_coords["lat"], st.session_state.end_coords["lng"]]
+elif st.session_state.start_coords:
+    center = [st.session_state.start_coords["lat"], st.session_state.start_coords["lng"]]
 
-# If clicked and a drop is active
-if map_data.get("last_clicked") and "dropping" in st.session_state:
-    coords = map_data["last_clicked"]
-    if st.session_state.dropping == "start":
-        st.session_state.start_coords = coords
-    elif st.session_state.dropping == "end":
-        st.session_state.end_coords = coords
-    st.session_state.dropping = None  # Reset
+# Create map
+m = folium.Map(location=center, zoom_start=12)
 
-# Re-render pins if already dropped
+# Add markers if present
 if st.session_state.start_coords:
     folium.Marker(
         [st.session_state.start_coords["lat"], st.session_state.start_coords["lng"]],
@@ -60,12 +75,23 @@ if st.session_state.end_coords:
         icon=folium.Icon(color="green")
     ).add_to(m)
 
-# Redraw map with pins
-st_folium(m, width=700, height=500)
+# Show map and handle clicks
+map_data = st_folium(m, width=700, height=500)
 
-# Show results
-st.markdown("---")
+# Update coordinates if clicked
+if map_data.get("last_clicked") and st.session_state.dropping:
+    coords = map_data["last_clicked"]
+    if st.session_state.dropping == "start":
+        st.session_state.start_coords = coords
+    elif st.session_state.dropping == "end":
+        st.session_state.end_coords = coords
+    st.session_state.dropping = None  # clear dropping flag
+
+# Final summary
+st.divider()
 if st.session_state.start_coords and st.session_state.end_coords:
-    st.success("✅ Coordinates captured!")
-    st.write("**Current Location:**", st.session_state.start_coords)
-    st.write("**Destination:**", st.session_state.end_coords)
+    st.success("✅ Locations Selected!")
+    st.markdown(f"""
+    - **Current Location:** `{st.session_state.start_coords["lat"]:.5f}, {st.session_state.start_coords["lng"]:.5f}`
+    - **Destination:** `{st.session_state.end_coords["lat"]:.5f}, {st.session_state.end_coords["lng"]:.5f}`
+    """)
