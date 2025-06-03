@@ -1,3 +1,10 @@
 streamlit
 folium
 streamlit-folium
+networkx 
+psycopg2 
+shapely 
+geopy
+math
+pandas 
+Routing
