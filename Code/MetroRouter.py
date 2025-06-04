@@ -40,7 +40,7 @@ with col2:
 
 st.divider()
 
-# --- Buttons for manual location drop ---
+# --- Manual Location Drop Buttons ---
 col3, col4 = st.columns(2)
 with col3:
     if st.button("🔵 Drop Current Location Manually"):
@@ -58,24 +58,8 @@ elif st.session_state.start_coords:
 
 m = folium.Map(location=center, zoom_start=12)
 
-# --- Markers ---
-if st.session_state.start_coords:
-    folium.Marker(
-        [st.session_state.start_coords["lat"], st.session_state.start_coords["lng"]],
-        tooltip="📍 Current Location",
-        icon=folium.Icon(color="blue")
-    ).add_to(m)
-
-if st.session_state.end_coords:
-    folium.Marker(
-        [st.session_state.end_coords["lat"], st.session_state.end_coords["lng"]],
-        tooltip="🏁 Destination",
-        icon=folium.Icon(color="green")
-    ).add_to(m)
-
-# --- Map Interaction ---
+# --- Drop pins manually if map is clicked ---
 map_data = st_folium(m, width=700, height=500)
-
 if map_data.get("last_clicked") and st.session_state.dropping:
     coords = map_data["last_clicked"]
     if st.session_state.dropping == "start":
@@ -93,7 +77,6 @@ if st.session_state.start_coords and st.session_state.end_coords:
     - **Destination:** `{st.session_state.end_coords["lat"]:.5f}, {st.session_state.end_coords["lng"]:.5f}`
     """)
 
-    # Backend logic call
     user_current_coordinates = (
         st.session_state.start_coords["lat"],
         st.session_state.start_coords["lng"]
@@ -103,36 +86,73 @@ if st.session_state.start_coords and st.session_state.end_coords:
         st.session_state.end_coords["lng"]
     )
 
-    G, brt, yellow_brt, start, destination = Routing.graph_maker(user_current_coordinates, user_destination_coordinates)
-    path, total_distance_km, travel_time_min = Routing.path_finding(G, start, destination, brt, yellow_brt)
+    G, red_brt, yellow_brt, blue_brt, green_brt, start, destination = Routing.graph_maker(user_current_coordinates, user_destination_coordinates)
+    route_info, total_distance_km, travel_time_min, total_cost = Routing.path_finding(G, start, destination, red_brt, yellow_brt, blue_brt, green_brt)
+    st.write("Graph nodes:", list(G.nodes(data=True))[:5])  # Preview first 5 nodes
+    st.write("Red BRT: ", red_brt)
+    # --- Show all stops on map ---
+    def plot_stops(line_stops, color):
+        for stop in line_stops:
+            stop_upper = stop["name"].upper()
+            if stop_upper not in G.nodes:
+                st.warning(f"🚫 Stop '{stop}' not found in graph!")
+                continue
+            if "pos" not in G.nodes[stop_upper]:
+                st.warning(f"🚫 Stop '{stop}' has no 'pos' attribute!")
+                continue
+            lat, lon = G.nodes[stop_upper]["pos"]
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=6,
+                color=color,
+                fill=True,
+                fill_opacity=0.8,
+                tooltip=stop["name"].title(),  # cleaner display
+            ).add_to(m)
 
-    # --- Path Summary ---
-    # --- Path Summary ---
-    st.markdown("### 📍 Route Path (Station - Line)")
 
-    previous_line = None
-    for i, stop in enumerate(path):
-        station = stop['station']
-        line = stop['line']
+    plot_stops(red_brt, "red")
+    plot_stops(yellow_brt, "orange")
+    plot_stops(blue_brt, "blue")
+    plot_stops(green_brt, "green")
 
-        line_display = f"{station} - {line}"
-        
-        # Check for interchange
-        if previous_line and line != previous_line:
-            st.markdown(f"🔁 **Interchange to {line} Line**")
-        
-        st.write(f"{i+1}. {line_display}")
-        previous_line = line
+    # --- Add current and destination markers ---
+    folium.Marker(
+        location=user_current_coordinates,
+        tooltip="📍 Current Location",
+        icon=folium.Icon(color="blue")
+    ).add_to(m)
 
+    folium.Marker(
+        location=user_destination_coordinates,
+        tooltip="🏁 Destination",
+        icon=folium.Icon(color="green")
+    ).add_to(m)
 
-    st.markdown("### 📊 Travel Summary")
-    st.write(f"**Total Distance:** {total_distance_km:.2f} km")
-    st.write(f"**Estimated Travel Time:** {travel_time_min:.1f} minutes")
-
-    # --- Draw path on map ---
-    coords_map = [G.nodes[stop["station"]]["pos"] for stop in path]
+    # --- Draw travel path ---
+    coords_map = [G.nodes[stop["station"]]["pos"] for stop in route_info]
     folium.PolyLine(coords_map, color="red", weight=5, tooltip="Route Path").add_to(m)
 
-    # Redisplay map with path
+    # --- Draw dashed lines for walking paths ---
+    first_station_coords = coords_map[0]
+    if user_current_coordinates != first_station_coords:
+        folium.PolyLine([user_current_coordinates, first_station_coords], color="black", dash_array="5,5", tooltip="Walk to Start").add_to(m)
+
+    last_station_coords = coords_map[-1]
+    if user_destination_coordinates != last_station_coords:
+        folium.PolyLine([last_station_coords, user_destination_coordinates], color="black", dash_array="5,5", tooltip="Walk to Destination").add_to(m)
+
+    # --- Path Summary ---
+    st.markdown("### 📍 Route Path (Station - Line)")
+    for i, segment in enumerate(route_info):
+        st.write(f"{i+1}. {segment['station']} - {segment['line']}")
+
+    # --- Travel Summary ---
+    st.markdown("### 🧾 Travel Summary")
+    st.write(f"**Total Distance:** {total_distance_km:.2f} km")
+    st.write(f"**Estimated Travel Time:** {travel_time_min:.1f} minutes")
+    st.write(f"**Estimated Cost:** {total_cost} PKR")
+
+    # --- Final Map Display ---
     st.markdown("### 🗺️ Route on Map")
     st_folium(m, width=700, height=500)
