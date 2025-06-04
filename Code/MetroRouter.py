@@ -87,29 +87,29 @@ if st.session_state.start_coords and st.session_state.end_coords:
     )
 
     G, red_brt, yellow_brt, blue_brt, green_brt, start, destination = Routing.graph_maker(user_current_coordinates, user_destination_coordinates)
+    Routing.print_full_graph(G)
     route_info, total_distance_km, travel_time_min, total_cost = Routing.path_finding(G, start, destination, red_brt, yellow_brt, blue_brt, green_brt)
-    st.write("Graph nodes:", list(G.nodes(data=True))[:5])  # Preview first 5 nodes
-    st.write("Red BRT: ", red_brt)
+    st.write("Graph nodes:", list(G.nodes(data=True))[:5])
+
     # --- Show all stops on map ---
     def plot_stops(line_stops, color):
         for stop in line_stops:
-            stop_upper = stop["name"].upper()
-            if stop_upper not in G.nodes:
-                st.warning(f"🚫 Stop '{stop}' not found in graph!")
+            stop_id = f"{stop['name']} ({stop['line']})"
+            if stop_id not in G.nodes:
+                st.warning(f"🚫 Stop '{stop_id}' not found in graph!")
                 continue
-            if "pos" not in G.nodes[stop_upper]:
-                st.warning(f"🚫 Stop '{stop}' has no 'pos' attribute!")
+            if "pos" not in G.nodes[stop_id]:
+                st.warning(f"🚫 Stop '{stop_id}' has no 'pos' attribute!")
                 continue
-            lat, lon = G.nodes[stop_upper]["pos"]
+            lat, lon = G.nodes[stop_id]["pos"]
             folium.CircleMarker(
                 location=[lat, lon],
                 radius=6,
                 color=color,
                 fill=True,
                 fill_opacity=0.8,
-                tooltip=stop["name"].title(),  # cleaner display
+                tooltip=stop["name"].title(),
             ).add_to(m)
-
 
     plot_stops(red_brt, "red")
     plot_stops(yellow_brt, "orange")

@@ -47,43 +47,91 @@ def graph_maker(user_current_coordinates, user_destination_coordinates):
     for line_stations in [red_brt, yellow_brt, blue_brt, green_brt]:
         for i in range(len(line_stations)):
             station = line_stations[i]
-            G.add_node(station['name'], pos=station['coords'], line=station['line'])
+            node_id = f"{station['name']} ({station['line']})"  # <-- Unique node ID
+            G.add_node(node_id, pos=station['coords'], line=station['line'], name=station['name'])
+
             if i > 0:
                 prev_station = line_stations[i - 1]
+                prev_node_id = f"{prev_station['name']} ({prev_station['line']})"
                 d = geodesic(station['coords'], prev_station['coords']).meters
-                G.add_edge(prev_station['name'], station['name'], weight=d)
+                G.add_edge(prev_node_id, node_id, weight=d)
+
             # Determine closest station to source and destination
             distancefromsource = geodesic(station['coords'], user_current_coordinates).meters
             distancefromdestination = geodesic(station['coords'], user_destination_coordinates).meters
             if distancefromsource < minimumSourceDistance:
                 minimumSourceDistance = distancefromsource
-                start = station['name']
+                start = f"{station['name']} ({station['line']})"
+
             if distancefromdestination < minimumDestinationDistance:
                 minimumDestinationDistance = distancefromdestination
-                destination = station['name']
-
+                destination = f"{station['name']} ({station['line']})"
     # Add interchanges between lines
     for i in range(len(all_stations)):
         for j in range(i + 1, len(all_stations)):
             s1 = all_stations[i]
             s2 = all_stations[j]
             if s1['line'] != s2['line']:
-                if geodesic(s1['coords'], s2['coords']).meters < 50:
-                    G.add_edge(s1['name'], s2['name'], weight=50)  # small threshold
+                d = geodesic(s1['coords'], s2['coords']).meters
+                if d < 500:
+                    n1 = f"{s1['name']} ({s1['line']})"
+                    n2 = f"{s2['name']} ({s2['line']})"
+                    G.add_edge(n1, n2, weight=d)
 
     return G, red_brt, yellow_brt, blue_brt, green_brt, start, destination
 
+def print_full_graph(G):
+    print("\n--- All Nodes ---")
+    for node in G.nodes(data=True):
+        print(node)
+
+    print("\n--- All Edges with Weights ---")
+    for u, v, data in G.edges(data=True):
+        print(f"{u} <--> {v} | weight = {data.get('weight', 'N/A')}")
+
+import networkx as nx
 
 def path_finding(G, start, destination, red_brt, yellow_brt, blue_brt, green_brt):
-    path = nx.shortest_path(G, source=start, target=destination, weight="weight")
+    def try_shortest_path(src, dst):
+        try:
+            return nx.shortest_path(G, source=src, target=dst, weight="weight")
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            return None
 
-    # Quick lookup sets for identifying the line
-    red_brt_names = {station["name"] for station in red_brt}
-    yellow_brt_names = {station["name"] for station in yellow_brt}
-    blue_brt_names = {station["name"] for station in blue_brt}
-    green_brt_names = {station["name"] for station in green_brt}
+    # Try the initial path
+    path = try_shortest_path(start, destination)
 
-    # Line-specific information
+    # If path not found, find nearest alternative starts
+    if not path:
+        print(f"No path found from '{start}' to '{destination}'. Trying closest alternative stations...")
+        candidates = []
+        for node in G.nodes():
+            try:
+                distance = nx.shortest_path_length(G, source=start, target=node, weight="weight")
+                candidates.append((distance, node))
+            except (nx.NetworkXNoPath, nx.NodeNotFound):
+                continue
+
+        # Sort nodes by distance from original start
+        candidates.sort()
+        print(candidates)
+        # Try alternate starts from closest to farthest
+        for _, alt_start in candidates:
+            path = try_shortest_path(alt_start, destination)
+            if path:
+                print(f"Found alternate path from '{alt_start}' to '{destination}'.")
+                start = alt_start
+                break
+
+    if not path:
+        print("❌ No valid route found from any nearby station.")
+        return None, 0, 0, 0
+
+    # Proceed as before with route breakdown
+    red_brt_names = {station["name"]+" (BRT)"  for station in red_brt}
+    yellow_brt_names = {station["name"]+" (BRT YELLOW)" for station in yellow_brt}
+    blue_brt_names = {station["name"]+" (BRT BLUE)" for station in blue_brt}
+    green_brt_names = {station["name"]+" (BRT GREEN)" for station in green_brt}
     line_info = {
         "Red BRT": {"wait_time": 2.5, "cost": 30},
         "Yellow BRT": {"wait_time": 5, "cost": 100},
@@ -99,7 +147,6 @@ def path_finding(G, start, destination, red_brt, yellow_brt, blue_brt, green_brt
     interchanges = []
 
     for i, node in enumerate(path):
-        # Determine which line the node belongs to
         if node in red_brt_names:
             line = "Red BRT"
         elif node in yellow_brt_names:
@@ -111,7 +158,6 @@ def path_finding(G, start, destination, red_brt, yellow_brt, blue_brt, green_brt
         else:
             line = "Unknown"
 
-        # Check for line change
         if previous_line and line != previous_line:
             interchanges.append({
                 "station": node,
@@ -121,13 +167,7 @@ def path_finding(G, start, destination, red_brt, yellow_brt, blue_brt, green_brt
         previous_line = line
         used_lines.add(line)
 
-        # Distance from previous node
-        if i > 0:
-            edge_data = G.get_edge_data(path[i - 1], node)
-            segment_distance = round(edge_data["weight"], 2)
-        else:
-            segment_distance = 0.0
-
+        segment_distance = round(G.get_edge_data(path[i - 1], node)["weight"], 2) if i > 0 else 0.0
         total_distance += segment_distance
 
         route_info.append({
@@ -136,28 +176,12 @@ def path_finding(G, start, destination, red_brt, yellow_brt, blue_brt, green_brt
             "segment_distance_m": segment_distance
         })
 
-    total_distance_km = total_distance / 1000  # convert to km
+    total_distance_km = total_distance / 1000
     avg_speed_kmh = 25
-    travel_time_hr = total_distance_km / avg_speed_kmh
-    travel_time_min = travel_time_hr * 60
-    travel_time_min += (len(path) - 1) * 0.5  # 30 seconds stop at each station
+    travel_time_min = (total_distance_km / avg_speed_kmh) * 60 + (len(path) - 1) * 0.5
 
-    # Calculate total waiting time and cost
-    total_wait_time = sum([line_info[line]["wait_time"] for line in used_lines if line in line_info])
-    total_cost = sum([line_info[line]["cost"] for line in used_lines if line in line_info])
+    total_wait_time = sum(line_info[line]["wait_time"] for line in used_lines if line in line_info)
+    total_cost = sum(line_info[line]["cost"] for line in used_lines if line in line_info)
 
-    print("\n--- Route Breakdown ---")
-    for segment in route_info:
-        print(f"{segment['station']} - {segment['line']} - {segment['segment_distance_m']} m")
-
-    print("\n--- Interchanges ---")
-    for interchange in interchanges:
-        print(f"Interchange at {interchange['station']}: {interchange['from_line']} -> {interchange['to_line']}")
-
-    print("\n--- Travel Summary ---")
-    print(f"Total Distance: {total_distance_km:.2f} km")
-    print(f"Estimated Travel Time: {travel_time_min + total_wait_time:.1f} minutes (including waiting time)")
-    print(f"Estimated Waiting Time: {total_wait_time:.1f} minutes")
-    print(f"Estimated Cost: {total_cost} PKR")
 
     return route_info, total_distance_km, travel_time_min + total_wait_time, total_cost
