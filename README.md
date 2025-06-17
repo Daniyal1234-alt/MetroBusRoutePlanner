@@ -61,15 +61,15 @@ A smart route planning tool for the Islamabad-Rawalpindi Metro Bus system, provi
     streamlit run app.py
 4. **Ensure PostgreSQL and PostGIS are installed and properly configured. Import the provided network data into your database if included.**
 
-📍 ### Future Work
-Add real-time traffic updates or delays
-Expand to other cities with similar BRT systems
-Mobile-friendly UI for field usage
+###📍  Future Work
+- Add real-time traffic updates or delays
+- Expand to other cities with similar BRT systems
+- Mobile-friendly UI for field usage
 
 ### Research Areas
-Machine learning for demand prediction
-Alternative routing algorithms (A*, Yen's)
-Accessibility features for special needs
+- Alternative routing algorithms (A*, Yen's)
+- Geospatial Data
+- Mapping 
 
 ### Contact:
 daniyalaziz184@gmail.com
