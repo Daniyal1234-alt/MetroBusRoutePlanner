@@ -62,6 +62,8 @@ A smart route planning tool for the Islamabad-Rawalpindi Metro Bus system, provi
 
 
 ### Contact:
-daniyalaziz184@gmail.com.
+- daniyalaziz184@gmail.com.
+
+
 ![Capture3](https://github.com/user-attachments/assets/d20f75cf-35f8-42e3-a6c2-489b34b32042)
 
