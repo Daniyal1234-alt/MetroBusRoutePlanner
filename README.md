@@ -1,19 +1,7 @@
 # MetroBusRoutePlanner 🚍
 
-![Metro Bus](https://via.placeholder.com/800x200?text=Islamabad+Metro+Bus+Route+Planner)
 
 A smart route planning tool for the Islamabad-Rawalpindi Metro Bus system, providing optimal routing between any two stations using advanced geospatial algorithms.
-
-## Table of Contents 📑
-- [Features](#-features)
-- [Technologies](#-technologies-used)
-- [Installation](#-installation)
-- [Usage](#-usage)
-- [Data Structure](#-data-structure)
-- [Algorithm](#-algorithm-details)
-- [Future Work](#-future-work)
-- [Contributing](#-contributing)
-- [License](#-license)
 
 ## 🔍 Features
 
@@ -58,10 +46,11 @@ A smart route planning tool for the Islamabad-Rawalpindi Metro Bus system, provi
     cd
 3. **Start the Streamlit app**:
    ```bash
-    streamlit run app.py
+    cd Code
+    streamlit run MetroRouter.py
 4. **Ensure PostgreSQL and PostGIS are installed and properly configured. Import the provided network data into your database if included.**
 
-###📍  Future Work
+## Future Work
 - Add real-time traffic updates or delays
 - Expand to other cities with similar BRT systems
 - Mobile-friendly UI for field usage
